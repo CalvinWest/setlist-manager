@@ -31,6 +31,9 @@ function App() {
   const [showAddSong, setShowAddSong] = useState(false);
   const [showAddSetlist, setShowAddSetlist] = useState(false);
   const [showAddToSetlist, setShowAddToSetlist] = useState(false);
+  const [addToSearch, setAddToSearch] = useState("");
+  const [addToFilterTempo, setAddToFilterTempo] = useState("All");
+  const [addToFilterStatus, setAddToFilterStatus] = useState("All");
   const [editingSongId, setEditingSongId] = useState(null);
   const [editValues, setEditValues] = useState({});
   const [filterTempo, setFilterTempo] = useState("All");
@@ -178,6 +181,71 @@ function App() {
     setOverIndex(null);
   };
 
+  const printSetlist = () => {
+    if (!activeSetlist) return;
+    const songNames = activeSetlist.songIds
+      .map((id) => songMap[id]?.name)
+      .filter(Boolean);
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${activeSetlist.name}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Georgia', serif;
+      background: #fff;
+      color: #000;
+      padding: 48px 56px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 32px;
+      letter-spacing: -0.02em;
+    }
+    ol {
+      list-style: none;
+      counter-reset: songs;
+    }
+    li {
+      counter-increment: songs;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      padding: 12px 0;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 26px;
+    }
+    li::before {
+      content: counter(songs);
+      min-width: 32px;
+      font-size: 15px;
+      color: #999;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    @media print {
+      body { padding: 24px 32px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>${activeSetlist.name}</h1>
+  <ol>
+    ${songNames.map((name) => `<li>${name}</li>`).join("\n    ")}
+  </ol>
+  <script>window.onload = () => window.print();<\/script>
+</body>
+</html>`;
+    const win = window.open("", "_blank");
+    win.document.write(html);
+    win.document.close();
+  };
+
   const activeSetlist = setlists.find((sl) => sl.id === activeSetlistId);
   const songMap = Object.fromEntries(songs.map((s) => [s.id, s]));
 
@@ -194,7 +262,11 @@ function App() {
 
   // Songs available to add to current setlist
   const availableSongs = activeSetlist
-    ? songs.filter((s) => !activeSetlist.songIds.includes(s.id))
+    ? songs
+        .filter((s) => !activeSetlist.songIds.includes(s.id))
+        .filter((s) => s.name.toLowerCase().includes(addToSearch.toLowerCase()))
+        .filter((s) => addToFilterTempo === "All" || s.tempo === addToFilterTempo)
+        .filter((s) => addToFilterStatus === "All" || s.status === addToFilterStatus)
     : [];
 
   if (!loaded) {
@@ -419,17 +491,50 @@ function App() {
                   {activeSetlist.songIds.length > 0 && " · drag to reorder"}
                 </p>
               </div>
-              <button style={styles.addBtn} onClick={() => setShowAddToSetlist(!showAddToSetlist)}>
-                {showAddToSetlist ? "Done" : "+ Add Songs"}
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                {activeSetlist.songIds.length > 0 && (
+                  <button style={styles.printBtn} onClick={printSetlist}>⎙ Print</button>
+                )}
+                <button style={styles.addBtn} onClick={() => {
+                  if (showAddToSetlist) {
+                    setAddToSearch("");
+                    setAddToFilterTempo("All");
+                    setAddToFilterStatus("All");
+                  }
+                  setShowAddToSetlist(!showAddToSetlist);
+                }}>
+                  {showAddToSetlist ? "Done" : "+ Add Songs"}
+                </button>
+              </div>
             </div>
 
             {/* Add songs to setlist panel */}
             {showAddToSetlist && (
               <div style={styles.addToSetlistPanel}>
+                <div style={styles.addToControls}>
+                  <input
+                    style={styles.addToSearch}
+                    placeholder="Search songs..."
+                    value={addToSearch}
+                    onChange={(e) => setAddToSearch(e.target.value)}
+                    autoFocus
+                  />
+                  <select style={styles.filterSelect} value={addToFilterTempo} onChange={(e) => setAddToFilterTempo(e.target.value)}>
+                    <option>All</option>
+                    {TEMPOS.map((t) => <option key={t}>{t}</option>)}
+                  </select>
+                  <select style={styles.filterSelect} value={addToFilterStatus} onChange={(e) => setAddToFilterStatus(e.target.value)}>
+                    <option>All</option>
+                    {STATUSES.map((s) => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
                 {availableSongs.length === 0 ? (
                   <div style={styles.emptySmall}>
-                    {songs.length === 0 ? "Your library is empty. Add songs in the Library first." : "All songs are already in this setlist."}
+                    {songs.length === 0
+                      ? "Your library is empty. Add songs in the Library first."
+                      : addToSearch || addToFilterTempo !== "All" || addToFilterStatus !== "All"
+                      ? "No songs match your search."
+                      : "All songs are already in this setlist."}
                   </div>
                 ) : (
                   availableSongs.map((song) => (
@@ -598,6 +703,18 @@ const styles = {
     fontFamily: "'DM Sans', sans-serif",
     whiteSpace: "nowrap",
     transition: "all 0.15s",
+  },
+  printBtn: {
+    padding: "10px 20px",
+    border: "1px solid #2a2a3a",
+    background: "#16161f",
+    color: "#707088",
+    borderRadius: 10,
+    cursor: "pointer",
+    fontSize: 14,
+    fontWeight: 600,
+    fontFamily: "'DM Sans', sans-serif",
+    whiteSpace: "nowrap",
   },
   confirmBtn: {
     padding: "10px 24px",
@@ -800,11 +917,28 @@ const styles = {
     borderRadius: 12,
     padding: 12,
     marginBottom: 20,
-    maxHeight: 240,
+    maxHeight: 320,
     overflowY: "auto",
     display: "flex",
     flexDirection: "column",
     gap: 2,
+  },
+  addToControls: {
+    display: "flex",
+    gap: 8,
+    marginBottom: 8,
+    flexWrap: "wrap",
+  },
+  addToSearch: {
+    flex: 1,
+    minWidth: 140,
+    padding: "7px 12px",
+    border: "1px solid #2a2a3a",
+    background: "#0e0e14",
+    color: "#e0e0ec",
+    borderRadius: 8,
+    fontSize: 14,
+    fontFamily: "'DM Sans', sans-serif",
   },
   addToRow: {
     display: "flex",
