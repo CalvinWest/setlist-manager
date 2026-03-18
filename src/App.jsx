@@ -40,12 +40,14 @@ function App() {
   const [filterStatus, setFilterStatus] = useState("All");
   const [sortBy, setSortBy] = useState("name");
   const [loaded, setLoaded] = useState(false);
+  const [importPending, setImportPending] = useState(null);
 
   // Drag state
   const [dragIndex, setDragIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
+  const importInputRef = useRef(null);
 
   // Load data
   useEffect(() => {
@@ -181,6 +183,55 @@ function App() {
     setOverIndex(null);
   };
 
+  const exportData = () => {
+    const data = JSON.stringify({ songs, setlists }, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "setlist-manager.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importData = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.songs && !data.setlists) { alert("Invalid file."); return; }
+        if (songs.length > 0 || setlists.length > 0) {
+          setImportPending(data);
+        } else {
+          if (data.songs) setSongs(data.songs);
+          if (data.setlists) setSetlists(data.setlists);
+        }
+      } catch {
+        alert("Invalid file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const applyImport = (mode) => {
+    if (!importPending) return;
+    if (mode === "replace") {
+      setSongs(importPending.songs || []);
+      setSetlists(importPending.setlists || []);
+    } else {
+      const existingIds = new Set(songs.map((s) => s.id));
+      const newSongs = (importPending.songs || []).filter((s) => !existingIds.has(s.id));
+      const existingSlIds = new Set(setlists.map((sl) => sl.id));
+      const newSetlists = (importPending.setlists || []).filter((sl) => !existingSlIds.has(sl.id));
+      setSongs((prev) => [...prev, ...newSongs]);
+      setSetlists((prev) => [...prev, ...newSetlists]);
+    }
+    setImportPending(null);
+  };
+
   const printSetlist = () => {
     if (!activeSetlist) return;
     const songNames = activeSetlist.songIds
@@ -287,6 +338,11 @@ function App() {
           <div style={styles.logo}>♫</div>
           <h1 style={styles.title}>Setlist Manager</h1>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input ref={importInputRef} type="file" accept=".json" style={{ display: "none" }} onChange={importData} />
+          <button style={styles.dataBtn} onClick={() => importInputRef.current.click()}>Load</button>
+          <button style={styles.dataBtn} onClick={exportData}>Save</button>
+        </div>
         <nav style={styles.nav}>
           <button
             style={{
@@ -312,6 +368,20 @@ function App() {
       </header>
 
       <main style={styles.main}>
+        {/* ── IMPORT CONFIRMATION ── */}
+        {importPending && (
+          <div style={styles.importBanner}>
+            <span style={styles.importBannerText}>
+              You already have data. Merge the file in, or replace everything?
+            </span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={styles.importBannerBtn} onClick={() => applyImport("merge")}>Merge</button>
+              <button style={{ ...styles.importBannerBtn, ...styles.importBannerBtnDanger }} onClick={() => applyImport("replace")}>Replace</button>
+              <button style={styles.importBannerCancel} onClick={() => setImportPending(null)}>✕</button>
+            </div>
+          </div>
+        )}
+
         {/* ── LIBRARY VIEW ── */}
         {activeView === "library" && (
           <div style={styles.section}>
@@ -593,6 +663,10 @@ function App() {
           </div>
         )}
       </main>
+
+      <footer style={styles.footer}>
+        by <a href="https://calvinwest.com" target="_blank" rel="noreferrer" style={styles.footerLink}>calvinwest.com</a>
+      </footer>
     </div>
   );
 }
@@ -703,6 +777,17 @@ const styles = {
     fontFamily: "'DM Sans', sans-serif",
     whiteSpace: "nowrap",
     transition: "all 0.15s",
+  },
+  dataBtn: {
+    padding: "6px 12px",
+    border: "1px solid #2a2a3a",
+    background: "transparent",
+    color: "#505068",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 500,
+    fontFamily: "'DM Sans', sans-serif",
   },
   printBtn: {
     padding: "10px 20px",
@@ -986,6 +1071,61 @@ const styles = {
     color: "#707088",
     fontFamily: "'JetBrains Mono', monospace",
     flexShrink: 0,
+  },
+
+  // Import banner
+  importBanner: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: "12px 16px",
+    background: "#1e1a2e",
+    border: "1px solid #3a2a5a",
+    borderRadius: 10,
+    marginBottom: 20,
+    flexWrap: "wrap",
+  },
+  importBannerText: { fontSize: 14, color: "#c0b0e0", flex: 1 },
+  importBannerBtn: {
+    padding: "7px 16px",
+    border: "1px solid #3a2a5a",
+    background: "#2a1e4a",
+    color: "#e0d0ff",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 600,
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  importBannerBtnDanger: {
+    background: "#2a1a1a",
+    border: "1px solid #5a2a2a",
+    color: "#ffb0b0",
+  },
+  importBannerCancel: {
+    width: 28,
+    height: 28,
+    border: "none",
+    background: "transparent",
+    color: "#505068",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontSize: 14,
+    fontFamily: "sans-serif",
+  },
+
+  // Footer
+  footer: {
+    padding: "20px 0",
+    borderTop: "1px solid #1e1e2e",
+    textAlign: "center",
+    fontSize: 12,
+    color: "#404058",
+  },
+  footerLink: {
+    color: "#404058",
+    textDecoration: "none",
   },
 
   // Empty
