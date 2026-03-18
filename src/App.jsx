@@ -36,9 +36,12 @@ function App() {
   const [addToFilterStatus, setAddToFilterStatus] = useState("All");
   const [editingSongId, setEditingSongId] = useState(null);
   const [editValues, setEditValues] = useState({});
+  const [librarySearch, setLibrarySearch] = useState("");
   const [filterTempo, setFilterTempo] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
   const [sortBy, setSortBy] = useState("name");
+  const [editingSetlistId, setEditingSetlistId] = useState(null);
+  const [editingSetlistName, setEditingSetlistName] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [importPending, setImportPending] = useState(null);
 
@@ -130,6 +133,13 @@ function App() {
       setActiveView("library");
       setActiveSetlistId(null);
     }
+  };
+
+  const renameSetlist = (id) => {
+    if (!editingSetlistName.trim()) return;
+    setSetlists((prev) => prev.map((sl) => sl.id === id ? { ...sl, name: editingSetlistName.trim() } : sl));
+    setEditingSetlistId(null);
+    setEditingSetlistName("");
   };
 
   const addSongToSetlist = (songId) => {
@@ -302,6 +312,7 @@ function App() {
 
   // Filtered + sorted songs for library
   const filteredSongs = songs
+    .filter((s) => s.name.toLowerCase().includes(librarySearch.toLowerCase()))
     .filter((s) => (filterTempo === "All" ? true : s.tempo === filterTempo))
     .filter((s) => (filterStatus === "All" ? true : s.status === filterStatus))
     .sort((a, b) => {
@@ -418,6 +429,16 @@ function App() {
               </div>
             )}
 
+            {/* Search */}
+            {songs.length > 0 && (
+              <input
+                style={styles.librarySearch}
+                placeholder="Search songs..."
+                value={librarySearch}
+                onChange={(e) => setLibrarySearch(e.target.value)}
+              />
+            )}
+
             {/* Filters */}
             {songs.length > 0 && (
               <div style={styles.filters}>
@@ -449,7 +470,7 @@ function App() {
             {/* Song list */}
             <div style={styles.songList}>
               {filteredSongs.length === 0 && songs.length > 0 && (
-                <div style={styles.empty}>No songs match your filters.</div>
+                <div style={styles.empty}>No songs match your search.</div>
               )}
               {songs.length === 0 && (
                 <div style={styles.empty}>Your library is empty. Add your first song above.</div>
@@ -489,7 +510,7 @@ function App() {
                       </div>
                       <div style={styles.songActions}>
                         <button className="action-btn" style={styles.iconBtn} onClick={() => startEdit(song)} title="Edit">✎</button>
-                        <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => deleteSong(song.id)} title="Delete">✕</button>
+                        <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => { if (window.confirm(`Delete "${song.name}"?`)) deleteSong(song.id); }} title="Delete">✕</button>
                       </div>
                     </>
                   )}
@@ -534,17 +555,40 @@ function App() {
                 <div
                   key={sl.id}
                   style={styles.setlistCard}
-                  onClick={() => { setActiveSetlistId(sl.id); setActiveView("setlist"); }}
+                  onClick={() => { if (editingSetlistId !== sl.id) { setActiveSetlistId(sl.id); setActiveView("setlist"); } }}
                 >
-                  <div style={styles.setlistCardName}>{sl.name}</div>
-                  <div style={styles.setlistCardMeta}>
-                    {sl.songIds.length} song{sl.songIds.length !== 1 ? "s" : ""} · {sl.date}
+                  {editingSetlistId === sl.id ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, paddingRight: 80 }} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        style={{ ...styles.editInput, flex: 1 }}
+                        value={editingSetlistName}
+                        onChange={(e) => setEditingSetlistName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") renameSetlist(sl.id); if (e.key === "Escape") { setEditingSetlistId(null); setEditingSetlistName(""); } }}
+                        autoFocus
+                      />
+                      <button style={styles.smallBtn} onClick={() => renameSetlist(sl.id)}>✓</button>
+                      <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger }} onClick={() => { setEditingSetlistId(null); setEditingSetlistName(""); }}>✕</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={styles.setlistCardName}>{sl.name}</div>
+                      <div style={styles.setlistCardMeta}>
+                        {sl.songIds.length} song{sl.songIds.length !== 1 ? "s" : ""} · {sl.date}
+                      </div>
+                    </>
+                  )}
+                  <div style={styles.setlistCardBtns} onClick={(e) => e.stopPropagation()}>
+                    <button
+                      style={{ ...styles.iconBtn, ...styles.iconBtnEdit }}
+                      onClick={(e) => { e.stopPropagation(); setEditingSetlistId(sl.id); setEditingSetlistName(sl.name); }}
+                      title="Rename setlist"
+                    >✎</button>
+                    <button
+                      style={{ ...styles.iconBtn, ...styles.iconBtnDanger }}
+                      onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete "${sl.name}"?`)) deleteSetlist(sl.id); }}
+                      title="Delete setlist"
+                    >✕</button>
                   </div>
-                  <button
-                    style={styles.setlistDeleteBtn}
-                    onClick={(e) => { e.stopPropagation(); deleteSetlist(sl.id); }}
-                    title="Delete setlist"
-                  >✕</button>
                 </div>
               ))}
             </div>
@@ -659,7 +703,7 @@ function App() {
                         </span>
                       </div>
                     </div>
-                    <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => removeSongFromSetlist(sid)} title="Remove">✕</button>
+                    <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => { if (window.confirm(`Remove "${song.name}" from this setlist?`)) removeSongFromSetlist(sid); }} title="Remove">✕</button>
                   </div>
                 );
               })}
@@ -878,6 +922,20 @@ const styles = {
     appearance: "auto",
   },
 
+  // Library search
+  librarySearch: {
+    width: "100%",
+    padding: "8px 14px",
+    border: "1px solid #2a2a3a",
+    background: "#0e0e14",
+    color: "#e0e0ec",
+    borderRadius: 8,
+    fontSize: 14,
+    fontFamily: "'DM Sans', sans-serif",
+    marginBottom: 12,
+    boxSizing: "border-box",
+  },
+
   // Filters
   filters: {
     display: "flex",
@@ -946,6 +1004,7 @@ const styles = {
     flexShrink: 0,
   },
   iconBtnDanger: { color: "#ef4444", borderColor: "#3a1a1a" },
+  iconBtnEdit: { color: "#707088", borderColor: "#2a2a3a" },
 
   // Edit row
   editRow: { display: "flex", gap: 8, alignItems: "center", width: "100%", flexWrap: "wrap" },
@@ -990,7 +1049,7 @@ const styles = {
   setlistGrid: { display: "flex", flexDirection: "column", gap: 8 },
   setlistCard: {
     position: "relative",
-    padding: "18px 20px",
+    padding: "18px 90px 18px 20px",
     background: "#16161f",
     borderRadius: 12,
     cursor: "pointer",
@@ -999,22 +1058,12 @@ const styles = {
   },
   setlistCardName: { fontSize: 17, fontWeight: 600, marginBottom: 4 },
   setlistCardMeta: { fontSize: 13, color: "#707088" },
-  setlistDeleteBtn: {
+  setlistCardBtns: {
     position: "absolute",
     top: 12,
     right: 12,
-    width: 32,
-    height: 32,
-    border: "1px solid #2a2a3a",
-    background: "#16161f",
-    color: "#555",
-    borderRadius: 8,
-    cursor: "pointer",
-    fontSize: 14,
     display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontFamily: "sans-serif",
+    gap: 6,
   },
 
   // Setlist detail
