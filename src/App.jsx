@@ -336,14 +336,14 @@ function App() {
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <div style={styles.logo}>♫</div>
-          <h1 style={styles.title}>Setlist Manager</h1>
+          <h1 style={styles.title}>Setlists</h1>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="data-btns">
           <input ref={importInputRef} type="file" accept=".json" style={{ display: "none" }} onChange={importData} />
           <button style={styles.dataBtn} onClick={() => importInputRef.current.click()}>Load</button>
           <button style={styles.dataBtn} onClick={exportData}>Save</button>
         </div>
-        <nav style={styles.nav}>
+        <nav className="main-nav" style={styles.nav}>
           <button
             style={{
               ...styles.navBtn,
@@ -476,18 +476,20 @@ function App() {
                     </div>
                   ) : (
                     <>
-                      <div style={styles.songName}>{song.name}</div>
-                      <div style={styles.songTags}>
-                        <span style={{ ...styles.tag, background: TEMPO_COLORS[song.tempo] + "22", color: TEMPO_COLORS[song.tempo], border: `1px solid ${TEMPO_COLORS[song.tempo]}44` }}>
-                          {song.tempo}
-                        </span>
-                        <span style={{ ...styles.tag, background: STATUS_COLORS[song.status] + "22", color: STATUS_COLORS[song.status], border: `1px solid ${STATUS_COLORS[song.status]}44` }}>
-                          {song.status}
-                        </span>
+                      <div className="song-main">
+                        <div style={styles.songName}>{song.name}</div>
+                        <div style={styles.songTags}>
+                          <span style={{ ...styles.tag, background: TEMPO_COLORS[song.tempo] + "22", color: TEMPO_COLORS[song.tempo], border: `1px solid ${TEMPO_COLORS[song.tempo]}44` }}>
+                            {song.tempo}
+                          </span>
+                          <span style={{ ...styles.tag, background: STATUS_COLORS[song.status] + "22", color: STATUS_COLORS[song.status], border: `1px solid ${STATUS_COLORS[song.status]}44` }}>
+                            {song.status}
+                          </span>
+                        </div>
                       </div>
                       <div style={styles.songActions}>
-                        <button style={styles.iconBtn} onClick={() => startEdit(song)} title="Edit">✎</button>
-                        <button style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => deleteSong(song.id)} title="Delete">✕</button>
+                        <button className="action-btn" style={styles.iconBtn} onClick={() => startEdit(song)} title="Edit">✎</button>
+                        <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => deleteSong(song.id)} title="Delete">✕</button>
                       </div>
                     </>
                   )}
@@ -646,16 +648,18 @@ function App() {
                   >
                     <div style={styles.dragHandle}>⠿</div>
                     <div style={styles.setlistNum}>{idx + 1}</div>
-                    <div style={styles.songName}>{song.name}</div>
-                    <div style={styles.songTags}>
-                      <span style={{ ...styles.tag, background: TEMPO_COLORS[song.tempo] + "22", color: TEMPO_COLORS[song.tempo], border: `1px solid ${TEMPO_COLORS[song.tempo]}44` }}>
-                        {song.tempo}
-                      </span>
-                      <span style={{ ...styles.tag, background: STATUS_COLORS[song.status] + "22", color: STATUS_COLORS[song.status], border: `1px solid ${STATUS_COLORS[song.status]}44` }}>
-                        {song.status}
-                      </span>
+                    <div className="setlist-content">
+                      <div style={styles.songName}>{song.name}</div>
+                      <div style={styles.songTags}>
+                        <span style={{ ...styles.tag, background: TEMPO_COLORS[song.tempo] + "22", color: TEMPO_COLORS[song.tempo], border: `1px solid ${TEMPO_COLORS[song.tempo]}44` }}>
+                          {song.tempo}
+                        </span>
+                        <span style={{ ...styles.tag, background: STATUS_COLORS[song.status] + "22", color: STATUS_COLORS[song.status], border: `1px solid ${STATUS_COLORS[song.status]}44` }}>
+                          {song.status}
+                        </span>
+                      </div>
                     </div>
-                    <button style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => removeSongFromSetlist(sid)} title="Remove">✕</button>
+                    <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => removeSongFromSetlist(sid)} title="Remove">✕</button>
                   </div>
                 );
               })}
@@ -686,6 +690,22 @@ const globalCSS = `
   select option {
     background: #1a1a28;
     color: #e0e0ec;
+  }
+
+  .data-btns { display: flex; align-items: center; gap: 8px; }
+
+  .song-main { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+  .setlist-content { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+  .action-btn:hover { background: #22222f !important; border-color: #404058 !important; }
+
+  @media (max-width: 520px) {
+    .data-btns { flex-direction: column; gap: 4px; }
+    .main-nav { flex-direction: column; }
+    .song-main { flex-direction: column; align-items: flex-start; gap: 5px; }
+    .setlist-content { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .action-btn { width: 42px !important; height: 42px !important; border-radius: 10px !important; font-size: 17px !important; }
   }
 `;
 
@@ -910,21 +930,22 @@ const styles = {
   },
   songActions: { display: "flex", gap: 4, flexShrink: 0 },
   iconBtn: {
-    width: 30,
-    height: 30,
-    border: "none",
-    background: "transparent",
+    width: 34,
+    height: 34,
+    border: "1px solid #2a2a3a",
+    background: "#16161f",
     color: "#707088",
-    borderRadius: 6,
+    borderRadius: 8,
     cursor: "pointer",
-    fontSize: 16,
+    fontSize: 15,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     transition: "all 0.1s",
     fontFamily: "sans-serif",
+    flexShrink: 0,
   },
-  iconBtnDanger: { color: "#ef4444" },
+  iconBtnDanger: { color: "#ef4444", borderColor: "#3a1a1a" },
 
   // Edit row
   editRow: { display: "flex", gap: 8, alignItems: "center", width: "100%", flexWrap: "wrap" },
@@ -982,12 +1003,12 @@ const styles = {
     position: "absolute",
     top: 12,
     right: 12,
-    width: 28,
-    height: 28,
-    border: "none",
-    background: "transparent",
+    width: 32,
+    height: 32,
+    border: "1px solid #2a2a3a",
+    background: "#16161f",
     color: "#555",
-    borderRadius: 6,
+    borderRadius: 8,
     cursor: "pointer",
     fontSize: 14,
     display: "flex",
