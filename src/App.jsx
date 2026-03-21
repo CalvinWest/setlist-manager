@@ -277,7 +277,6 @@ function App() {
       gap: 16px;
       padding: 12px 0;
       border-bottom: 1px solid #e0e0e0;
-      font-size: 26px;
     }
     li::before {
       content: counter(songs);
@@ -299,10 +298,24 @@ function App() {
   <ol>
     ${songNames.map((name) => `<li>${name}</li>`).join("\n    ")}
   </ol>
-  <script>window.onload = () => window.print();<\/script>
+  <script>
+    window.onload = () => {
+      const items = Array.from(document.querySelectorAll('li'));
+      items.forEach(li => li.style.whiteSpace = 'nowrap');
+      let lo = 8, hi = 72;
+      while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        items.forEach(li => li.style.fontSize = mid + 'px');
+        if (items.every(li => li.scrollWidth <= li.clientWidth)) lo = mid;
+        else hi = mid;
+      }
+      items.forEach(li => li.style.fontSize = lo + 'px');
+      window.print();
+    };
+  <\/script>
 </body>
 </html>`;
-    const win = window.open("", "_blank");
+    const win = window.open("", "setlist-print");
     win.document.write(html);
     win.document.close();
   };
