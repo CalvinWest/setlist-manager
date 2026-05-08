@@ -19,6 +19,59 @@ const STATUS_COLORS = {
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+const KEY_ROOTS = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+const KEYS = KEY_ROOTS.flatMap((r) => [`${r} Major`, `${r} Minor`]);
+const KEY_ROOT_INDEX = {
+  C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5,
+  "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11,
+};
+
+// Returns 'same', 'relative', 'different', or 'none'
+function getKeyRelationship(a, b) {
+  if (!a || !b) return "none";
+  if (a === b) return "same";
+  const parse = (k) => {
+    const i = k.lastIndexOf(" ");
+    return { root: KEY_ROOT_INDEX[k.slice(0, i)], mode: k.slice(i + 1) };
+  };
+  const ka = parse(a), kb = parse(b);
+  if (ka.root === undefined || kb.root === undefined) return "none";
+  if (ka.root === kb.root && ka.mode === kb.mode) return "same";
+  if (ka.mode === "Major" && kb.mode === "Minor" && kb.root === (ka.root + 9) % 12) return "relative";
+  if (ka.mode === "Minor" && kb.mode === "Major" && kb.root === (ka.root + 3) % 12) return "relative";
+  return "different";
+}
+
+function formatDur(secs) {
+  if (!secs && secs !== 0) return "";
+  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+}
+
+function parseDur(str) {
+  if (!str?.trim()) return null;
+  const s = str.trim();
+  if (s.includes(":")) {
+    const [m, sec] = s.split(":");
+    return (parseInt(m) || 0) * 60 + (parseInt(sec) || 0);
+  }
+  const m = parseInt(s);
+  return isNaN(m) ? null : m * 60;
+}
+
+function formatGap(secs) {
+  if (secs === 0) return "0s";
+  if (secs < 60) return `${secs}s`;
+  if (secs % 60 === 0) return `${secs / 60}m`;
+  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+}
+
+const KEY_WARN_STYLE = {
+  none:     { bg: "#16222e", color: "#5090b0", border: "#1a3050" },
+  different:{ bg: "#16222e", color: "#5090b0", border: "#1a3050" },
+  relative: { bg: "#332800", color: "#d4a030", border: "#504000" },
+  same:     { bg: "#331500", color: "#e05030", border: "#503018" },
+};
+
 function App() {
   const [songs, setSongs] = useState([]);
   const [setlists, setSetlists] = useState([]);
@@ -44,6 +97,8 @@ function App() {
   const [editingSetlistName, setEditingSetlistName] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [importPending, setImportPending] = useState(null);
+  const [newSongKey, setNewSongKey] = useState("");
+  const [newSongDuration, setNewSongDuration] = useState("");
 
   // Drag state
   const [dragIndex, setDragIndex] = useState(null);
@@ -82,11 +137,20 @@ function App() {
     if (!newSongName.trim()) return;
     setSongs((prev) => [
       ...prev,
-      { id: uid(), name: newSongName.trim(), tempo: newSongTempo, status: newSongStatus },
+      {
+        id: uid(),
+        name: newSongName.trim(),
+        tempo: newSongTempo,
+        status: newSongStatus,
+        key: newSongKey || null,
+        duration: parseDur(newSongDuration),
+      },
     ]);
     setNewSongName("");
     setNewSongTempo("Midtempo");
     setNewSongStatus("Idea");
+    setNewSongKey("");
+    setNewSongDuration("");
     setShowAddSong(false);
   };
 
@@ -102,14 +166,14 @@ function App() {
 
   const startEdit = (song) => {
     setEditingSongId(song.id);
-    setEditValues({ name: song.name, tempo: song.tempo, status: song.status });
+    setEditValues({ name: song.name, tempo: song.tempo, status: song.status, key: song.key || "", duration: formatDur(song.duration) });
   };
 
   const saveEdit = () => {
     setSongs((prev) =>
       prev.map((s) =>
         s.id === editingSongId
-          ? { ...s, name: editValues.name, tempo: editValues.tempo, status: editValues.status }
+          ? { ...s, name: editValues.name, tempo: editValues.tempo, status: editValues.status, key: editValues.key || null, duration: parseDur(editValues.duration) }
           : s
       )
     );
@@ -119,7 +183,7 @@ function App() {
   // Setlist CRUD
   const addSetlist = () => {
     if (!newSetlistName.trim()) return;
-    const sl = { id: uid(), name: newSetlistName.trim(), songIds: [], date: new Date().toISOString().slice(0, 10) };
+    const sl = { id: uid(), name: newSetlistName.trim(), songIds: [], date: new Date().toISOString().slice(0, 10), gapSeconds: 60 };
     setSetlists((prev) => [...prev, sl]);
     setNewSetlistName("");
     setShowAddSetlist(false);
@@ -140,6 +204,12 @@ function App() {
     setSetlists((prev) => prev.map((sl) => sl.id === id ? { ...sl, name: editingSetlistName.trim() } : sl));
     setEditingSetlistId(null);
     setEditingSetlistName("");
+  };
+
+  const updateSetlistGap = (id, secs) => {
+    setSetlists((prev) =>
+      prev.map((sl) => sl.id === id ? { ...sl, gapSeconds: Math.max(0, Math.min(300, secs)) } : sl)
+    );
   };
 
   const addSongToSetlist = (songId) => {
@@ -323,6 +393,32 @@ function App() {
   const activeSetlist = setlists.find((sl) => sl.id === activeSetlistId);
   const songMap = Object.fromEntries(songs.map((s) => [s.id, s]));
 
+  const setlistSongsData = activeSetlist ? activeSetlist.songIds.map((id) => songMap[id]).filter(Boolean) : [];
+  const timedSongs = setlistSongsData.filter((s) => s.duration);
+  const totalSongSecs = timedSongs.reduce((sum, s) => sum + s.duration, 0);
+  const activeGapSecs = activeSetlist?.gapSeconds ?? 60;
+  const gapCount = Math.max(0, setlistSongsData.length - 1);
+  const totalWithGapsSecs = totalSongSecs + gapCount * activeGapSecs;
+
+  const keyConflicts = activeSetlist
+    ? activeSetlist.songIds.map((sid, idx) => {
+        const song = songMap[sid];
+        if (!song?.key) return "none";
+        const ids = activeSetlist.songIds;
+        let worst = "none";
+        const check = (otherId) => {
+          const other = songMap[otherId];
+          if (!other?.key) return;
+          const rel = getKeyRelationship(song.key, other.key);
+          if (rel === "same") worst = "same";
+          else if (rel === "relative" && worst !== "same") worst = "relative";
+        };
+        if (idx > 0) check(ids[idx - 1]);
+        if (idx < ids.length - 1) check(ids[idx + 1]);
+        return worst;
+      })
+    : [];
+
   // Filtered + sorted songs for library
   const filteredSongs = songs
     .filter((s) => s.name.toLowerCase().includes(librarySearch.toLowerCase()))
@@ -437,6 +533,17 @@ function App() {
                   <select style={styles.select} value={newSongStatus} onChange={(e) => setNewSongStatus(e.target.value)}>
                     {STATUSES.map((s) => <option key={s}>{s}</option>)}
                   </select>
+                  <select style={styles.select} value={newSongKey} onChange={(e) => setNewSongKey(e.target.value)}>
+                    <option value="">Key (optional)</option>
+                    {KEYS.map((k) => <option key={k}>{k}</option>)}
+                  </select>
+                  <input
+                    style={{ ...styles.select, width: 80 }}
+                    placeholder="0:00"
+                    value={newSongDuration}
+                    onChange={(e) => setNewSongDuration(e.target.value)}
+                    title="Duration (M:SS)"
+                  />
                   <button style={styles.confirmBtn} onClick={addSong}>Add</button>
                 </div>
               </div>
@@ -505,6 +612,17 @@ function App() {
                       <select style={styles.editSelect} value={editValues.status} onChange={(e) => setEditValues((v) => ({ ...v, status: e.target.value }))}>
                         {STATUSES.map((s) => <option key={s}>{s}</option>)}
                       </select>
+                      <select style={styles.editSelect} value={editValues.key || ""} onChange={(e) => setEditValues((v) => ({ ...v, key: e.target.value }))}>
+                        <option value="">No key</option>
+                        {KEYS.map((k) => <option key={k}>{k}</option>)}
+                      </select>
+                      <input
+                        style={{ ...styles.editSelect, width: 70 }}
+                        placeholder="0:00"
+                        value={editValues.duration || ""}
+                        onChange={(e) => setEditValues((v) => ({ ...v, duration: e.target.value }))}
+                        title="Duration (M:SS)"
+                      />
                       <button style={styles.smallBtn} onClick={saveEdit}>✓</button>
                       <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger }} onClick={() => setEditingSongId(null)}>✕</button>
                     </div>
@@ -519,6 +637,16 @@ function App() {
                           <span style={{ ...styles.tag, background: STATUS_COLORS[song.status] + "22", color: STATUS_COLORS[song.status], border: `1px solid ${STATUS_COLORS[song.status]}44` }}>
                             {song.status}
                           </span>
+                          {song.key && (
+                            <span style={{ ...styles.tag, background: KEY_WARN_STYLE.none.bg, color: KEY_WARN_STYLE.none.color, border: `1px solid ${KEY_WARN_STYLE.none.border}` }}>
+                              {song.key.replace("Major", "Maj").replace("Minor", "Min")}
+                            </span>
+                          )}
+                          {song.duration && (
+                            <span style={{ ...styles.tag, background: "#162020", color: "#50a080", border: "1px solid #1a3828" }}>
+                              {formatDur(song.duration)}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div style={styles.songActions}>
@@ -619,6 +747,34 @@ function App() {
                   {activeSetlist.songIds.length} song{activeSetlist.songIds.length !== 1 ? "s" : ""}
                   {activeSetlist.songIds.length > 0 && " · drag to reorder"}
                 </p>
+                {timedSongs.length > 0 && (
+                  <div style={styles.durationBar}>
+                    <span style={styles.durBarItem}>⏱ {formatDur(totalSongSecs)}</span>
+                    {timedSongs.length < setlistSongsData.length && (
+                      <span style={styles.durBarMuted}>({timedSongs.length}/{setlistSongsData.length} timed)</span>
+                    )}
+                    {gapCount > 0 && (
+                      <>
+                        <span style={styles.durBarSep}>·</span>
+                        <span style={styles.durBarItem}>
+                          <button
+                            style={{ ...styles.gapBtn, opacity: activeGapSecs === 0 ? 0.4 : 1 }}
+                            onClick={() => updateSetlistGap(activeSetlistId, activeGapSecs - 30)}
+                            disabled={activeGapSecs === 0}
+                          >−</button>
+                          {" "}{formatGap(activeGapSecs)} gap{" "}
+                          <button
+                            style={{ ...styles.gapBtn, opacity: activeGapSecs >= 300 ? 0.4 : 1 }}
+                            onClick={() => updateSetlistGap(activeSetlistId, activeGapSecs + 30)}
+                            disabled={activeGapSecs >= 300}
+                          >+</button>
+                        </span>
+                        <span style={styles.durBarSep}>·</span>
+                        <span style={styles.durBarItem}>{formatDur(totalWithGapsSecs)} total</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {activeSetlist.songIds.length > 0 && (
@@ -688,6 +844,8 @@ function App() {
                 if (!song) return null;
                 const isDragging = dragIndex === idx;
                 const isOver = overIndex === idx;
+                const conflict = keyConflicts[idx] || "none";
+                const kwStyle = KEY_WARN_STYLE[conflict];
                 return (
                   <div
                     key={sid}
@@ -714,6 +872,16 @@ function App() {
                         <span style={{ ...styles.tag, background: STATUS_COLORS[song.status] + "22", color: STATUS_COLORS[song.status], border: `1px solid ${STATUS_COLORS[song.status]}44` }}>
                           {song.status}
                         </span>
+                        {song.key && (
+                          <span style={{ ...styles.tag, background: kwStyle.bg, color: kwStyle.color, border: `1px solid ${kwStyle.border}` }} title={conflict === "same" ? "Same key as adjacent song" : conflict === "relative" ? "Relative key with adjacent song" : undefined}>
+                            {song.key.replace("Major", "Maj").replace("Minor", "Min")}
+                          </span>
+                        )}
+                        {song.duration && (
+                          <span style={{ ...styles.tag, background: "#162020", color: "#50a080", border: "1px solid #1a3828" }}>
+                            {formatDur(song.duration)}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => { if (window.confirm(`Remove "${song.name}" from this setlist?`)) removeSongFromSetlist(sid); }} title="Remove">✕</button>
@@ -1209,6 +1377,42 @@ const styles = {
   footerLink: {
     color: "#404058",
     textDecoration: "none",
+  },
+
+  // Duration bar
+  durationBar: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+    flexWrap: "wrap",
+  },
+  durBarItem: {
+    color: "#a0a0b8",
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 13,
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+  },
+  durBarMuted: { color: "#505068", fontSize: 12 },
+  durBarSep: { color: "#404058", fontSize: 13 },
+  gapBtn: {
+    width: 22,
+    height: 22,
+    border: "1px solid #2a2a3a",
+    background: "#22222f",
+    color: "#707088",
+    borderRadius: 5,
+    cursor: "pointer",
+    fontSize: 15,
+    lineHeight: 1,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "sans-serif",
+    verticalAlign: "middle",
+    padding: 0,
   },
 
   // Empty
