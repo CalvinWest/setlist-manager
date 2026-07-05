@@ -5,7 +5,10 @@
       "Bash(node -e \"const p = require\\(''''./node_modules/vite-plugin-pwa/package.json''''\\); console.log\\(p.version\\)\")",
       "Bash(npx pwa-assets-generator:*)",
       "Bash(npm run:*)",
-      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\Setlist-manager\" -Force)"
+      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\Setlist-manager\" -Force)",
+      "PowerShell(Stop-Process -Id 10752 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 5183 -ErrorAction SilentlyContinue)",
+      "Bash(curl -s -o /dev/null -w \"status: %{http_code}\\\\n\" --max-time 2 http://localhost:5183/)"
     ]
   }
 }
