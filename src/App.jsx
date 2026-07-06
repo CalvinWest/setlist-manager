@@ -201,6 +201,21 @@ function App() {
     setCellDraft("");
   };
 
+  // Menu-style cells (tempo/status/key) close when clicking anywhere outside
+  // the currently open menu. Only one menu is ever open, so a single ref
+  // (attached to whichever cell is active) is enough to detect that.
+  const activeMenuRef = useRef(null);
+  useEffect(() => {
+    if (!editingCell || !["tempo", "status", "key"].includes(editingCell.field)) return;
+    const handlePointerDown = (e) => {
+      if (activeMenuRef.current && !activeMenuRef.current.contains(e.target)) {
+        setEditingCell(null);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [editingCell]);
+
   // Inline editable field renderers — shared by the library and setlist views
   // so editing a song anywhere updates the one underlying song record.
   const renderNameCell = (song) => {
@@ -259,26 +274,31 @@ function App() {
     );
   };
 
+  // Shared floating menu for the tempo/status/key cells — opens fully expanded
+  // on the first click (unlike a native <select>, which needs a second
+  // interaction to expand after being focused).
+  const renderDropdownMenu = (values, currentValue, onSelect, formatLabel, swatchColor) => (
+    <div ref={activeMenuRef} className="inline-dropdown" style={styles.dropdownMenu} onClick={(e) => e.stopPropagation()}>
+      {values.map((value) => (
+        <div
+          key={value}
+          className="dropdown-item"
+          style={{ ...styles.dropdownItem, ...(value === currentValue ? styles.dropdownItemActive : {}) }}
+          onClick={() => { onSelect(value); setEditingCell(null); }}
+        >
+          {swatchColor && <span style={{ ...styles.dropdownSwatch, background: swatchColor(value) }} />}
+          {formatLabel ? formatLabel(value) : value}
+        </div>
+      ))}
+    </div>
+  );
+
   const renderKeyCell = (song, conflictStyle) => {
     const col = FIELD_COLUMNS[1];
     const kwStyle = conflictStyle || KEY_WARN_STYLE.none;
-    if (isEditingCell(song.id, "key")) {
-      return (
-        <select
-          autoFocus
-          style={{ ...styles.cellSelect, width: col.width }}
-          value={song.key || ""}
-          onChange={(e) => { updateSong(song.id, { key: e.target.value || null }); setEditingCell(null); }}
-          onBlur={() => setEditingCell(null)}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <option value="">No key</option>
-          {KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
-        </select>
-      );
-    }
+    const open = isEditingCell(song.id, "key");
     return (
-      <div className="field-col" style={{ ...styles.fieldCol, width: col.width }} onClick={() => startCellEdit(song, "key")} title="Click to edit key">
+      <div className="field-col" style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "key")} title={open ? undefined : "Click to edit key"}>
         {song.key ? (
           <span className="tag-pill" style={{ ...styles.tag, background: kwStyle.bg, color: kwStyle.color, border: `1px solid ${kwStyle.border}` }}>
             {song.key.replace("Major", "Maj").replace("Minor", "Min")}
@@ -286,56 +306,38 @@ function App() {
         ) : (
           <span style={styles.emptyCell}>–</span>
         )}
+        {open && renderDropdownMenu(
+          ["", ...KEYS],
+          song.key || "",
+          (val) => updateSong(song.id, { key: val || null }),
+          (val) => (val ? val.replace("Major", "Maj").replace("Minor", "Min") : "No key")
+        )}
       </div>
     );
   };
 
   const renderTempoCell = (song) => {
     const col = FIELD_COLUMNS[2];
-    if (isEditingCell(song.id, "tempo")) {
-      return (
-        <select
-          autoFocus
-          style={{ ...styles.cellSelect, width: col.width }}
-          value={song.tempo}
-          onChange={(e) => { updateSong(song.id, { tempo: e.target.value }); setEditingCell(null); }}
-          onBlur={() => setEditingCell(null)}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {TEMPOS.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-      );
-    }
+    const open = isEditingCell(song.id, "tempo");
     return (
-      <div className="field-col" style={{ ...styles.fieldCol, width: col.width }} onClick={() => startCellEdit(song, "tempo")} title="Click to edit tempo">
+      <div className="field-col" style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "tempo")} title={open ? undefined : "Click to edit tempo"}>
         <span className="tag-pill" style={{ ...styles.tag, background: TEMPO_COLORS[song.tempo] + "22", color: TEMPO_COLORS[song.tempo], border: `1px solid ${TEMPO_COLORS[song.tempo]}44` }}>
           {song.tempo}
         </span>
+        {open && renderDropdownMenu(TEMPOS, song.tempo, (val) => updateSong(song.id, { tempo: val }), null, (t) => TEMPO_COLORS[t])}
       </div>
     );
   };
 
   const renderStatusCell = (song) => {
     const col = FIELD_COLUMNS[3];
-    if (isEditingCell(song.id, "status")) {
-      return (
-        <select
-          autoFocus
-          style={{ ...styles.cellSelect, width: col.width }}
-          value={song.status}
-          onChange={(e) => { updateSong(song.id, { status: e.target.value }); setEditingCell(null); }}
-          onBlur={() => setEditingCell(null)}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      );
-    }
+    const open = isEditingCell(song.id, "status");
     return (
-      <div className="field-col" style={{ ...styles.fieldCol, width: col.width }} onClick={() => startCellEdit(song, "status")} title="Click to edit status">
+      <div className="field-col" style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "status")} title={open ? undefined : "Click to edit status"}>
         <span className="tag-pill" style={{ ...styles.tag, background: STATUS_COLORS[song.status] + "22", color: STATUS_COLORS[song.status], border: `1px solid ${STATUS_COLORS[song.status]}44` }}>
           {song.status}
         </span>
+        {open && renderDropdownMenu(STATUSES, song.status, (val) => updateSong(song.id, { status: val }), null, (s) => STATUS_COLORS[s])}
       </div>
     );
   };
@@ -1053,6 +1055,8 @@ const globalCSS = `
   .field-col, .song-name-editable { cursor: pointer; border-radius: 6px; transition: background 0.1s; }
   .field-col:hover, .song-name-editable:hover { background: #1c1c28; }
 
+  .dropdown-item:hover { background: #22222f; }
+
   @media (max-width: 520px) {
     .data-btns { flex-direction: column; gap: 4px; }
     .main-nav { flex-direction: column; }
@@ -1324,21 +1328,51 @@ const styles = {
     textAlign: "center",
     flexShrink: 0,
   },
-  cellSelect: {
-    padding: "4px 6px",
-    border: "1px solid #2a2a3a",
-    background: "#0e0e14",
-    color: "#e0e0ec",
-    borderRadius: 6,
-    fontSize: 12,
-    fontFamily: "'DM Sans', sans-serif",
-    cursor: "pointer",
-    flexShrink: 0,
-  },
   fieldCol: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: "calc(100% + 4px)",
+    left: 0,
+    minWidth: 140,
+    maxHeight: 260,
+    overflowY: "auto",
+    background: "#1a1a28",
+    border: "1px solid #2a2a3a",
+    borderRadius: 8,
+    padding: 4,
+    zIndex: 20,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+  },
+  dropdownItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "6px 10px",
+    borderRadius: 6,
+    fontSize: 13,
+    fontWeight: 500,
+    fontFamily: "'DM Sans', sans-serif",
+    color: "#c0c0d0",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    textAlign: "left",
+  },
+  dropdownItemActive: {
+    background: "#25253a",
+    color: "#fff",
+  },
+  dropdownSwatch: {
+    width: 8,
+    height: 8,
+    borderRadius: "50%",
     flexShrink: 0,
   },
   fieldColsRow: {

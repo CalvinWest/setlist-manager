@@ -8,7 +8,10 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\Setlist-manager\" -Force)",
       "PowerShell(Stop-Process -Id 10752 -Force -ErrorAction SilentlyContinue)",
       "PowerShell(Get-NetTCPConnection -LocalPort 5183 -ErrorAction SilentlyContinue)",
-      "Bash(curl -s -o /dev/null -w \"status: %{http_code}\\\\n\" --max-time 2 http://localhost:5183/)"
+      "Bash(curl -s -o /dev/null -w \"status: %{http_code}\\\\n\" --max-time 2 http://localhost:5183/)",
+      "Bash(npx vite *)",
+      "Bash(timeout 20 bash -c 'until curl -sf http://localhost:5183/ >/dev/null; do sleep 0.5; done')",
+      "Bash(node drive2.js)"
     ]
   }
 }
