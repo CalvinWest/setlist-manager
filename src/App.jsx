@@ -317,7 +317,7 @@ function App() {
       );
     }
     return (
-      <div className="field-col" style={{ ...styles.fieldCol, width: col.width }} onClick={() => startCellEdit(song, "duration")} title="Click to edit duration">
+      <div className={`field-col field-col-${col.key}`} style={{ ...styles.fieldCol, width: col.width }} onClick={() => startCellEdit(song, "duration")} title="Click to edit duration">
         {song.duration ? (
           <span className="tag-pill" style={{ ...styles.tag, background: "#162020", color: "#50a080", border: "1px solid #1a3828" }}>
             {formatDur(song.duration)}
@@ -353,7 +353,7 @@ function App() {
     const kwStyle = conflictStyle || KEY_WARN_STYLE.none;
     const open = isEditingCell(song.id, "key");
     return (
-      <div className="field-col" style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "key")} title={open ? undefined : "Click to edit key"}>
+      <div className={`field-col field-col-${col.key}`} style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "key")} title={open ? undefined : "Click to edit key"}>
         {song.key ? (
           <span className="tag-pill" style={{ ...styles.tag, background: kwStyle.bg, color: kwStyle.color, border: `1px solid ${kwStyle.border}` }}>
             {song.key.replace("Major", "Maj").replace("Minor", "Min")}
@@ -375,7 +375,7 @@ function App() {
     const col = FIELD_COLUMNS[2];
     const open = isEditingCell(song.id, "tempo");
     return (
-      <div className="field-col" style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "tempo")} title={open ? undefined : "Click to edit tempo"}>
+      <div className={`field-col field-col-${col.key}`} style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "tempo")} title={open ? undefined : "Click to edit tempo"}>
         <span className="tag-pill" style={{ ...styles.tag, background: TEMPO_COLORS[song.tempo] + "22", color: TEMPO_COLORS[song.tempo], border: `1px solid ${TEMPO_COLORS[song.tempo]}44` }}>
           {song.tempo}
         </span>
@@ -388,7 +388,7 @@ function App() {
     const col = FIELD_COLUMNS[3];
     const open = isEditingCell(song.id, "status");
     return (
-      <div className="field-col" style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "status")} title={open ? undefined : "Click to edit status"}>
+      <div className={`field-col field-col-${col.key}`} style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "status")} title={open ? undefined : "Click to edit status"}>
         <span className="tag-pill" style={{ ...styles.tag, background: STATUS_COLORS[song.status] + "22", color: STATUS_COLORS[song.status], border: `1px solid ${STATUS_COLORS[song.status]}44` }}>
           {song.status}
         </span>
@@ -407,9 +407,9 @@ function App() {
   );
 
   const fieldColumnLabels = (
-    <div style={styles.fieldColsRow}>
+    <div className="field-cols" style={styles.fieldColsRow}>
       {FIELD_COLUMNS.map((c) => (
-        <div key={c.key} style={{ ...styles.colHeaderCell, width: c.width }}>{c.label}</div>
+        <div key={c.key} className={`field-col-${c.key}`} style={{ ...styles.colHeaderCell, width: c.width }}>{c.label}</div>
       ))}
     </div>
   );
@@ -824,8 +824,10 @@ function App() {
             {/* Song list */}
             {filteredSongs.length > 0 && (
               <div className="field-header" style={styles.songListHeaderRow}>
-                <div style={{ flex: 1 }} />
-                {fieldColumnLabels}
+                <div className="song-main">
+                  <div style={{ flex: 1 }} />
+                  {fieldColumnLabels}
+                </div>
                 <div style={{ width: 34, flexShrink: 0 }} />
               </div>
             )}
@@ -1036,10 +1038,12 @@ function App() {
             {/* Setlist songs with drag-and-drop */}
             {activeSetlist.songIds.length > 0 && (
               <div className="field-header" style={styles.setlistListHeaderRow}>
-                <div style={{ width: 18, flexShrink: 0 }} />
+                <div className="drag-handle" style={{ width: 18, flexShrink: 0 }} />
                 <div style={{ width: 26, flexShrink: 0 }} />
-                <div style={{ flex: 1 }} />
-                {fieldColumnLabels}
+                <div className="setlist-content">
+                  <div style={{ flex: 1 }} />
+                  {fieldColumnLabels}
+                </div>
                 <div style={{ width: 34, flexShrink: 0 }} />
               </div>
             )}
@@ -1077,7 +1081,7 @@ function App() {
                       onTouchEnd={handleSwipeEnd(sid, () => removeSongFromSetlist(sid))}
                       onTouchCancel={handleSwipeCancel(sid)}
                     >
-                      <div style={styles.dragHandle}>⠿</div>
+                      <div className="drag-handle" style={styles.dragHandle}>⠿</div>
                       <div style={styles.setlistNum}>{idx + 1}</div>
                       <div className="setlist-content">
                         {renderNameCell(song)}
@@ -1141,10 +1145,13 @@ const globalCSS = `
   @media (max-width: 700px) {
     .song-main { flex-direction: column; align-items: flex-start; gap: 6px; }
     .setlist-content { flex-direction: column; align-items: flex-start; gap: 6px; }
-    .field-header { display: none !important; }
-    .field-cols { flex-wrap: wrap; }
-    .field-col { width: auto !important; justify-content: flex-start !important; }
+    .field-cols { flex-wrap: wrap; gap: 4px !important; }
+    .field-col-duration { width: 36px !important; }
+    .field-col-key { width: 46px !important; }
+    .field-col-tempo { width: 68px !important; }
+    .field-col-status { width: 76px !important; }
     .row-delete-btn { display: none !important; }
+    .drag-handle { display: none !important; }
   }
 `;
 
@@ -1362,15 +1369,14 @@ const styles = {
     background: "#13131c",
     borderRadius: 10,
     transition: "background 0.1s",
+    position: "relative",
   },
   swipeWrap: {
     position: "relative",
-    zIndex: 0,
   },
   swipeDeleteBg: {
     position: "absolute",
     inset: 0,
-    zIndex: -1,
     background: "#3a1414",
     borderRadius: 10,
     display: "flex",
@@ -1625,6 +1631,7 @@ const styles = {
     cursor: "grab",
     transition: "opacity 0.15s, border 0.1s",
     userSelect: "none",
+    position: "relative",
   },
   dragHandle: {
     color: "#444",
