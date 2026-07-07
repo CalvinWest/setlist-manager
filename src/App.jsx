@@ -1129,15 +1129,15 @@ const globalCSS = `
      pixel widths duplicated in JS, no risk of header/data drifting apart. */
   .row-grid {
     display: grid;
-    grid-template-columns: 1fr 60px 72px 104px 112px 34px;
-    grid-template-areas: "name time key tempo status actions";
+    grid-template-columns: minmax(0, max-content) 60px minmax(0, 1fr) 72px 104px 112px 34px;
+    grid-template-areas: "name time spacer key tempo status actions";
     align-items: center;
     column-gap: 12px;
   }
   .setlist-row-grid {
     display: grid;
-    grid-template-columns: 18px 26px 1fr 60px 72px 104px 112px 34px;
-    grid-template-areas: "handle num name time key tempo status actions";
+    grid-template-columns: 18px 26px minmax(0, max-content) 60px minmax(0, 1fr) 72px 104px 112px 34px;
+    grid-template-areas: "handle num name time spacer key tempo status actions";
     align-items: center;
     column-gap: 10px;
   }
@@ -1176,7 +1176,7 @@ const globalCSS = `
     .row-grid > .g-actions,
     .setlist-row-grid > .g-actions,
     .setlist-row-grid > .g-handle {
-      display: none;
+      display: none !important;
     }
   }
 `;
@@ -1520,15 +1520,9 @@ const styles = {
     fontFamily: "'JetBrains Mono', monospace",
   },
   songListHeaderRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
     padding: "0 16px 6px",
   },
   setlistListHeaderRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
     padding: "0 14px 6px",
   },
   iconBtn: {
