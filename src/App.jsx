@@ -114,6 +114,61 @@ function App() {
   const dragOverItem = useRef(null);
   const importInputRef = useRef(null);
 
+  // Swipe-to-delete state (touch only — mouse drag above is a separate concern)
+  const [swipeRow, setSwipeRow] = useState(null); // { id, dx, dragging, removing }
+  const touchStartRef = useRef(null);
+  const touchDxRef = useRef(0);
+  const SWIPE_MAX = 120;
+  const SWIPE_THRESHOLD = 80;
+
+  const handleSwipeStart = (id) => (e) => {
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+    touchDxRef.current = 0;
+    setSwipeRow({ id, dx: 0, dragging: true });
+  };
+
+  const handleSwipeMove = (id) => (e) => {
+    if (!touchStartRef.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchStartRef.current.x;
+    const dy = t.clientY - touchStartRef.current.y;
+    if (Math.abs(dy) > Math.abs(dx)) return; // vertical scroll wins
+    const clamped = Math.max(-SWIPE_MAX, Math.min(0, dx));
+    touchDxRef.current = clamped;
+    setSwipeRow({ id, dx: clamped, dragging: true });
+  };
+
+  const handleSwipeEnd = (id, onDelete) => () => {
+    const dx = touchDxRef.current;
+    touchStartRef.current = null;
+    touchDxRef.current = 0;
+    if (dx <= -SWIPE_THRESHOLD) {
+      setSwipeRow({ id, dx, dragging: false, removing: true });
+      setTimeout(() => {
+        onDelete();
+        setSwipeRow(null);
+      }, 180);
+    } else {
+      setSwipeRow({ id, dx: 0, dragging: false });
+    }
+  };
+
+  const handleSwipeCancel = (id) => () => {
+    touchStartRef.current = null;
+    touchDxRef.current = 0;
+    setSwipeRow({ id, dx: 0, dragging: false });
+  };
+
+  const swipeStyle = (id) => {
+    if (!swipeRow || swipeRow.id !== id) return {};
+    return {
+      transform: `translateX(${swipeRow.dx}px)`,
+      opacity: swipeRow.removing ? 0 : 1,
+      transition: swipeRow.dragging ? "none" : "transform 0.2s ease, opacity 0.2s ease",
+    };
+  };
+
   // Load data
   useEffect(() => {
     try {
@@ -782,13 +837,22 @@ function App() {
                 <div style={styles.empty}>Your library is empty. Add your first song above.</div>
               )}
               {filteredSongs.map((song) => (
-                <div key={song.id} style={styles.songRow}>
-                  <div className="song-main">
-                    {renderNameCell(song)}
-                    {renderFieldColumns(song)}
-                  </div>
-                  <div style={styles.songActions}>
-                    <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => { if (window.confirm(`Delete "${song.name}"?`)) deleteSong(song.id); }} title="Delete">✕</button>
+                <div key={song.id} style={styles.swipeWrap}>
+                  <div className="swipe-delete-bg" style={styles.swipeDeleteBg}>Delete</div>
+                  <div
+                    style={{ ...styles.songRow, touchAction: "pan-y", ...swipeStyle(song.id) }}
+                    onTouchStart={handleSwipeStart(song.id)}
+                    onTouchMove={handleSwipeMove(song.id)}
+                    onTouchEnd={handleSwipeEnd(song.id, () => deleteSong(song.id))}
+                    onTouchCancel={handleSwipeCancel(song.id)}
+                  >
+                    <div className="song-main">
+                      {renderNameCell(song)}
+                      {renderFieldColumns(song)}
+                    </div>
+                    <div className="row-delete-btn" style={styles.songActions}>
+                      <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => { if (window.confirm(`Delete "${song.name}"?`)) deleteSong(song.id); }} title="Delete">✕</button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -999,19 +1063,30 @@ function App() {
                     onDragEnd={handleDragEnd}
                     onDragOver={(e) => e.preventDefault()}
                     style={{
-                      ...styles.setlistItem,
+                      ...styles.swipeWrap,
                       opacity: isDragging ? 0.4 : 1,
                       borderTop: isOver && dragIndex > idx ? "2px solid #e8a838" : undefined,
                       borderBottom: isOver && dragIndex < idx ? "2px solid #e8a838" : undefined,
                     }}
                   >
-                    <div style={styles.dragHandle}>⠿</div>
-                    <div style={styles.setlistNum}>{idx + 1}</div>
-                    <div className="setlist-content">
-                      {renderNameCell(song)}
-                      {renderFieldColumns(song, kwStyle)}
+                    <div className="swipe-delete-bg" style={styles.swipeDeleteBg}>Remove</div>
+                    <div
+                      style={{ ...styles.setlistItem, touchAction: "pan-y", ...swipeStyle(sid) }}
+                      onTouchStart={handleSwipeStart(sid)}
+                      onTouchMove={handleSwipeMove(sid)}
+                      onTouchEnd={handleSwipeEnd(sid, () => removeSongFromSetlist(sid))}
+                      onTouchCancel={handleSwipeCancel(sid)}
+                    >
+                      <div style={styles.dragHandle}>⠿</div>
+                      <div style={styles.setlistNum}>{idx + 1}</div>
+                      <div className="setlist-content">
+                        {renderNameCell(song)}
+                        {renderFieldColumns(song, kwStyle)}
+                      </div>
+                      <div className="row-delete-btn" style={{ display: "flex", flexShrink: 0 }}>
+                        <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => { if (window.confirm(`Remove "${song.name}" from this setlist?`)) removeSongFromSetlist(sid); }} title="Remove">✕</button>
+                      </div>
                     </div>
-                    <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => { if (window.confirm(`Remove "${song.name}" from this setlist?`)) removeSongFromSetlist(sid); }} title="Remove">✕</button>
                   </div>
                 );
               })}
@@ -1066,8 +1141,10 @@ const globalCSS = `
   @media (max-width: 700px) {
     .song-main { flex-direction: column; align-items: flex-start; gap: 6px; }
     .setlist-content { flex-direction: column; align-items: flex-start; gap: 6px; }
-    .field-header { display: none; }
+    .field-header { display: none !important; }
     .field-cols { flex-wrap: wrap; }
+    .field-col { width: auto !important; justify-content: flex-start !important; }
+    .row-delete-btn { display: none !important; }
   }
 `;
 
@@ -1285,6 +1362,25 @@ const styles = {
     background: "#13131c",
     borderRadius: 10,
     transition: "background 0.1s",
+  },
+  swipeWrap: {
+    position: "relative",
+    zIndex: 0,
+  },
+  swipeDeleteBg: {
+    position: "absolute",
+    inset: 0,
+    zIndex: -1,
+    background: "#3a1414",
+    borderRadius: 10,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    padding: "0 22px",
+    color: "#ff9090",
+    fontWeight: 700,
+    fontSize: 14,
+    letterSpacing: "0.02em",
   },
   songName: {
     flex: 1,
