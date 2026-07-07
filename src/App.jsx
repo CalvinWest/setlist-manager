@@ -19,13 +19,6 @@ const STATUS_COLORS = {
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-const FIELD_COLUMNS = [
-  { key: "duration", label: "Time", width: 60 },
-  { key: "key", label: "Key", width: 72 },
-  { key: "tempo", label: "Tempo", width: 104 },
-  { key: "status", label: "Status", width: 112 },
-];
-
 const KEY_ROOTS = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const KEYS = KEY_ROOTS.flatMap((r) => [`${r} Major`, `${r} Minor`]);
 const KEY_ROOT_INDEX = {
@@ -63,6 +56,15 @@ function parseDur(str) {
   }
   const m = parseInt(s);
   return isNaN(m) ? null : m * 60;
+}
+
+// "F# Major" -> "F#", "F# Minor" -> "F#m"
+function formatKey(key) {
+  if (!key) return "";
+  const i = key.lastIndexOf(" ");
+  const root = key.slice(0, i);
+  const mode = key.slice(i + 1);
+  return mode === "Minor" ? `${root}m` : root;
 }
 
 function formatGap(secs) {
@@ -273,11 +275,15 @@ function App() {
 
   // Inline editable field renderers — shared by the library and setlist views
   // so editing a song anywhere updates the one underlying song record.
+  // Each cell is assigned a CSS grid-area (g-name/g-time/g-key/g-tempo/g-status)
+  // so the header row and every data row — which all share the same grid
+  // template — line up automatically instead of needing hand-tuned widths.
   const renderNameCell = (song) => {
     if (isEditingCell(song.id, "name")) {
       return (
         <input
           autoFocus
+          className="g-name"
           style={styles.nameInput}
           value={cellDraft}
           onChange={(e) => setCellDraft(e.target.value)}
@@ -291,19 +297,19 @@ function App() {
       );
     }
     return (
-      <div className="song-name-editable" style={styles.songName} onClick={() => startCellEdit(song, "name")} title="Click to rename">
+      <div className="song-name-editable g-name" style={styles.songName} onClick={() => startCellEdit(song, "name")} title="Click to rename">
         {song.name}
       </div>
     );
   };
 
   const renderTimeCell = (song) => {
-    const col = FIELD_COLUMNS[0];
     if (isEditingCell(song.id, "duration")) {
       return (
         <input
           autoFocus
-          style={{ ...styles.cellInput, width: col.width }}
+          className="g-time"
+          style={styles.cellInput}
           value={cellDraft}
           placeholder="0:00"
           onChange={(e) => setCellDraft(e.target.value)}
@@ -317,7 +323,7 @@ function App() {
       );
     }
     return (
-      <div className={`field-col field-col-${col.key}`} style={{ ...styles.fieldCol, width: col.width }} onClick={() => startCellEdit(song, "duration")} title="Click to edit duration">
+      <div className="field-col g-time" style={styles.fieldCol} onClick={() => startCellEdit(song, "duration")} title="Click to edit duration">
         {song.duration ? (
           <span className="tag-pill" style={{ ...styles.tag, background: "#162020", color: "#50a080", border: "1px solid #1a3828" }}>
             {formatDur(song.duration)}
@@ -349,14 +355,13 @@ function App() {
   );
 
   const renderKeyCell = (song, conflictStyle) => {
-    const col = FIELD_COLUMNS[1];
     const kwStyle = conflictStyle || KEY_WARN_STYLE.none;
     const open = isEditingCell(song.id, "key");
     return (
-      <div className={`field-col field-col-${col.key}`} style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "key")} title={open ? undefined : "Click to edit key"}>
+      <div className="field-col g-key" style={{ ...styles.fieldCol, position: "relative" }} onClick={() => !open && startCellEdit(song, "key")} title={open ? undefined : "Click to edit key"}>
         {song.key ? (
           <span className="tag-pill" style={{ ...styles.tag, background: kwStyle.bg, color: kwStyle.color, border: `1px solid ${kwStyle.border}` }}>
-            {song.key.replace("Major", "Maj").replace("Minor", "Min")}
+            {formatKey(song.key)}
           </span>
         ) : (
           <span style={styles.emptyCell}>–</span>
@@ -365,17 +370,16 @@ function App() {
           ["", ...KEYS],
           song.key || "",
           (val) => updateSong(song.id, { key: val || null }),
-          (val) => (val ? val.replace("Major", "Maj").replace("Minor", "Min") : "No key")
+          (val) => (val ? formatKey(val) : "No key")
         )}
       </div>
     );
   };
 
   const renderTempoCell = (song) => {
-    const col = FIELD_COLUMNS[2];
     const open = isEditingCell(song.id, "tempo");
     return (
-      <div className={`field-col field-col-${col.key}`} style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "tempo")} title={open ? undefined : "Click to edit tempo"}>
+      <div className="field-col g-tempo" style={{ ...styles.fieldCol, position: "relative" }} onClick={() => !open && startCellEdit(song, "tempo")} title={open ? undefined : "Click to edit tempo"}>
         <span className="tag-pill" style={{ ...styles.tag, background: TEMPO_COLORS[song.tempo] + "22", color: TEMPO_COLORS[song.tempo], border: `1px solid ${TEMPO_COLORS[song.tempo]}44` }}>
           {song.tempo}
         </span>
@@ -385,10 +389,9 @@ function App() {
   };
 
   const renderStatusCell = (song) => {
-    const col = FIELD_COLUMNS[3];
     const open = isEditingCell(song.id, "status");
     return (
-      <div className={`field-col field-col-${col.key}`} style={{ ...styles.fieldCol, width: col.width, position: "relative" }} onClick={() => !open && startCellEdit(song, "status")} title={open ? undefined : "Click to edit status"}>
+      <div className="field-col g-status" style={{ ...styles.fieldCol, position: "relative" }} onClick={() => !open && startCellEdit(song, "status")} title={open ? undefined : "Click to edit status"}>
         <span className="tag-pill" style={{ ...styles.tag, background: STATUS_COLORS[song.status] + "22", color: STATUS_COLORS[song.status], border: `1px solid ${STATUS_COLORS[song.status]}44` }}>
           {song.status}
         </span>
@@ -398,20 +401,21 @@ function App() {
   };
 
   const renderFieldColumns = (song, conflictStyle) => (
-    <div className="field-cols" style={styles.fieldColsRow}>
+    <>
       {renderTimeCell(song)}
       {renderKeyCell(song, conflictStyle)}
       {renderTempoCell(song)}
       {renderStatusCell(song)}
-    </div>
+    </>
   );
 
   const fieldColumnLabels = (
-    <div className="field-cols" style={styles.fieldColsRow}>
-      {FIELD_COLUMNS.map((c) => (
-        <div key={c.key} className={`field-col-${c.key}`} style={{ ...styles.colHeaderCell, width: c.width }}>{c.label}</div>
-      ))}
-    </div>
+    <>
+      <div className="g-time" style={styles.colHeaderCell}>Time</div>
+      <div className="g-key" style={styles.colHeaderCell}>Key</div>
+      <div className="g-tempo" style={styles.colHeaderCell}>Tempo</div>
+      <div className="g-status" style={styles.colHeaderCell}>Status</div>
+    </>
   );
 
   // Setlist CRUD
@@ -769,7 +773,7 @@ function App() {
                   </select>
                   <select style={styles.select} value={newSongKey} onChange={(e) => setNewSongKey(e.target.value)}>
                     <option value="">Key (optional)</option>
-                    {KEYS.map((k) => <option key={k}>{k}</option>)}
+                    {KEYS.map((k) => <option key={k} value={k}>{formatKey(k)}</option>)}
                   </select>
                   <input
                     style={{ ...styles.select, width: 80 }}
@@ -823,12 +827,8 @@ function App() {
 
             {/* Song list */}
             {filteredSongs.length > 0 && (
-              <div className="field-header" style={styles.songListHeaderRow}>
-                <div className="song-main">
-                  <div style={{ flex: 1 }} />
-                  {fieldColumnLabels}
-                </div>
-                <div style={{ width: 34, flexShrink: 0 }} />
+              <div className="row-grid field-header" style={styles.songListHeaderRow}>
+                {fieldColumnLabels}
               </div>
             )}
             <div style={styles.songList}>
@@ -842,17 +842,16 @@ function App() {
                 <div key={song.id} style={styles.swipeWrap}>
                   <div className="swipe-delete-bg" style={styles.swipeDeleteBg}>Delete</div>
                   <div
+                    className="row-grid"
                     style={{ ...styles.songRow, touchAction: "pan-y", ...swipeStyle(song.id) }}
                     onTouchStart={handleSwipeStart(song.id)}
                     onTouchMove={handleSwipeMove(song.id)}
                     onTouchEnd={handleSwipeEnd(song.id, () => deleteSong(song.id))}
                     onTouchCancel={handleSwipeCancel(song.id)}
                   >
-                    <div className="song-main">
-                      {renderNameCell(song)}
-                      {renderFieldColumns(song)}
-                    </div>
-                    <div className="row-delete-btn" style={styles.songActions}>
+                    {renderNameCell(song)}
+                    {renderFieldColumns(song)}
+                    <div className="g-actions row-delete-btn" style={styles.songActions}>
                       <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => { if (window.confirm(`Delete "${song.name}"?`)) deleteSong(song.id); }} title="Delete">✕</button>
                     </div>
                   </div>
@@ -1037,14 +1036,8 @@ function App() {
 
             {/* Setlist songs with drag-and-drop */}
             {activeSetlist.songIds.length > 0 && (
-              <div className="field-header" style={styles.setlistListHeaderRow}>
-                <div className="drag-handle" style={{ width: 18, flexShrink: 0 }} />
-                <div style={{ width: 26, flexShrink: 0 }} />
-                <div className="setlist-content">
-                  <div style={{ flex: 1 }} />
-                  {fieldColumnLabels}
-                </div>
-                <div style={{ width: 34, flexShrink: 0 }} />
+              <div className="setlist-row-grid field-header" style={styles.setlistListHeaderRow}>
+                {fieldColumnLabels}
               </div>
             )}
             <div style={styles.setlistSongs}>
@@ -1075,19 +1068,18 @@ function App() {
                   >
                     <div className="swipe-delete-bg" style={styles.swipeDeleteBg}>Remove</div>
                     <div
+                      className="setlist-row-grid"
                       style={{ ...styles.setlistItem, touchAction: "pan-y", ...swipeStyle(sid) }}
                       onTouchStart={handleSwipeStart(sid)}
                       onTouchMove={handleSwipeMove(sid)}
                       onTouchEnd={handleSwipeEnd(sid, () => removeSongFromSetlist(sid))}
                       onTouchCancel={handleSwipeCancel(sid)}
                     >
-                      <div className="drag-handle" style={styles.dragHandle}>⠿</div>
-                      <div style={styles.setlistNum}>{idx + 1}</div>
-                      <div className="setlist-content">
-                        {renderNameCell(song)}
-                        {renderFieldColumns(song, kwStyle)}
-                      </div>
-                      <div className="row-delete-btn" style={{ display: "flex", flexShrink: 0 }}>
+                      <div className="drag-handle g-handle" style={styles.dragHandle}>⠿</div>
+                      <div className="g-num" style={styles.setlistNum}>{idx + 1}</div>
+                      {renderNameCell(song)}
+                      {renderFieldColumns(song, kwStyle)}
+                      <div className="g-actions row-delete-btn" style={{ display: "flex", flexShrink: 0 }}>
                         <button className="action-btn" style={{ ...styles.iconBtn, ...styles.iconBtnDanger }} onClick={() => { if (window.confirm(`Remove "${song.name}" from this setlist?`)) removeSongFromSetlist(sid); }} title="Remove">✕</button>
                       </div>
                     </div>
@@ -1125,16 +1117,38 @@ const globalCSS = `
 
   .data-btns { display: flex; align-items: center; gap: 8px; }
 
-  .song-main { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; }
-
-  .setlist-content { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
-
   .action-btn:hover { background: #22222f !important; border-color: #404058 !important; }
 
   .field-col, .song-name-editable { cursor: pointer; border-radius: 6px; transition: background 0.1s; }
   .field-col:hover, .song-name-editable:hover { background: #1c1c28; }
 
   .dropdown-item:hover { background: #22222f; }
+
+  /* Row layout: a single CSS grid template shared by the header row and every
+     data row in a list, so columns are guaranteed to line up — no per-column
+     pixel widths duplicated in JS, no risk of header/data drifting apart. */
+  .row-grid {
+    display: grid;
+    grid-template-columns: 1fr 60px 72px 104px 112px 34px;
+    grid-template-areas: "name time key tempo status actions";
+    align-items: center;
+    column-gap: 12px;
+  }
+  .setlist-row-grid {
+    display: grid;
+    grid-template-columns: 18px 26px 1fr 60px 72px 104px 112px 34px;
+    grid-template-areas: "handle num name time key tempo status actions";
+    align-items: center;
+    column-gap: 10px;
+  }
+  .g-name { grid-area: name; }
+  .g-time { grid-area: time; }
+  .g-key { grid-area: key; }
+  .g-tempo { grid-area: tempo; }
+  .g-status { grid-area: status; }
+  .g-actions { grid-area: actions; }
+  .g-handle { grid-area: handle; }
+  .g-num { grid-area: num; }
 
   @media (max-width: 520px) {
     .data-btns { flex-direction: column; gap: 4px; }
@@ -1143,15 +1157,27 @@ const globalCSS = `
   }
 
   @media (max-width: 700px) {
-    .song-main { flex-direction: column; align-items: flex-start; gap: 6px; }
-    .setlist-content { flex-direction: column; align-items: flex-start; gap: 6px; }
-    .field-cols { flex-wrap: wrap; gap: 4px !important; }
-    .field-col-duration { width: 36px !important; }
-    .field-col-key { width: 46px !important; }
-    .field-col-tempo { width: 68px !important; }
-    .field-col-status { width: 76px !important; }
-    .row-delete-btn { display: none !important; }
-    .drag-handle { display: none !important; }
+    .row-grid {
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-areas:
+        "name name name name"
+        "time key tempo status";
+      row-gap: 8px;
+      column-gap: 6px;
+    }
+    .setlist-row-grid {
+      grid-template-columns: 26px repeat(4, 1fr);
+      grid-template-areas:
+        "num name name name name"
+        "num time key tempo status";
+      row-gap: 8px;
+      column-gap: 6px;
+    }
+    .row-grid > .g-actions,
+    .setlist-row-grid > .g-actions,
+    .setlist-row-grid > .g-handle {
+      display: none;
+    }
   }
 `;
 
@@ -1362,9 +1388,6 @@ const styles = {
   // Song list
   songList: { display: "flex", flexDirection: "column", gap: 2 },
   songRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
     padding: "12px 16px",
     background: "#13131c",
     borderRadius: 10,
@@ -1389,7 +1412,6 @@ const styles = {
     letterSpacing: "0.02em",
   },
   songName: {
-    flex: 1,
     fontSize: 15,
     fontWeight: 500,
     minWidth: 0,
@@ -1405,12 +1427,12 @@ const styles = {
     fontFamily: "'JetBrains Mono', monospace",
     whiteSpace: "nowrap",
   },
-  songActions: { display: "flex", gap: 4, flexShrink: 0 },
+  songActions: { display: "flex", gap: 4 },
 
   // Inline-editable field columns (time, key, tempo, status)
   nameInput: {
-    flex: 1,
-    minWidth: 100,
+    width: "100%",
+    minWidth: 0,
     padding: "6px 10px",
     border: "1px solid #2a2a3a",
     background: "#0e0e14",
@@ -1420,6 +1442,8 @@ const styles = {
     fontFamily: "'DM Sans', sans-serif",
   },
   cellInput: {
+    width: "100%",
+    minWidth: 0,
     padding: "4px 8px",
     border: "1px solid #2a2a3a",
     background: "#0e0e14",
@@ -1428,13 +1452,11 @@ const styles = {
     fontSize: 12,
     fontFamily: "'JetBrains Mono', monospace",
     textAlign: "center",
-    flexShrink: 0,
   },
   fieldCol: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
   },
   dropdownMenu: {
     position: "absolute",
