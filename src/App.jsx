@@ -123,11 +123,14 @@ function App() {
   const SWIPE_MAX = 120;
   const SWIPE_THRESHOLD = 80;
 
+  // The transform is only ever applied while a horizontal swipe is actually in
+  // progress (or animating out) and is fully removed afterwards. A lingering
+  // transform — even translateX(0) — creates a stacking context on the row,
+  // which traps the inline dropdown beneath later sibling rows.
   const handleSwipeStart = (id) => (e) => {
     const t = e.touches[0];
     touchStartRef.current = { x: t.clientX, y: t.clientY };
     touchDxRef.current = 0;
-    setSwipeRow({ id, dx: 0, dragging: true });
   };
 
   const handleSwipeMove = (id) => (e) => {
@@ -151,15 +154,21 @@ function App() {
         onDelete();
         setSwipeRow(null);
       }, 180);
-    } else {
+    } else if (dx < 0) {
+      // Animate the snap-back, then drop the transform entirely.
       setSwipeRow({ id, dx: 0, dragging: false });
+      setTimeout(() => {
+        setSwipeRow((cur) => (cur && cur.id === id && !cur.dragging && !cur.removing ? null : cur));
+      }, 220);
+    } else {
+      setSwipeRow(null);
     }
   };
 
   const handleSwipeCancel = (id) => () => {
     touchStartRef.current = null;
     touchDxRef.current = 0;
-    setSwipeRow({ id, dx: 0, dragging: false });
+    setSwipeRow(null);
   };
 
   const swipeStyle = (id) => {
@@ -1499,12 +1508,6 @@ const styles = {
     borderRadius: "50%",
     flexShrink: 0,
   },
-  fieldColsRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    flexShrink: 0,
-  },
   colHeaderCell: {
     fontSize: 11,
     fontWeight: 600,
@@ -1638,9 +1641,6 @@ const styles = {
 
   setlistSongs: { display: "flex", flexDirection: "column", gap: 2 },
   setlistItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
     padding: "12px 14px",
     background: "#13131c",
     borderRadius: 10,
