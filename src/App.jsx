@@ -447,8 +447,10 @@ function App() {
   };
 
   const renameSetlist = (id) => {
-    if (!editingSetlistName.trim()) return;
-    setSetlists((prev) => prev.map((sl) => sl.id === id ? { ...sl, name: editingSetlistName.trim() } : sl));
+    const name = editingSetlistName.trim();
+    if (name) {
+      setSetlists((prev) => prev.map((sl) => sl.id === id ? { ...sl, name } : sl));
+    }
     setEditingSetlistId(null);
     setEditingSetlistName("");
   };
@@ -960,7 +962,28 @@ function App() {
             <div style={styles.sectionHeader}>
               <div>
                 <button style={styles.backBtn} onClick={() => setActiveView("setlists")}>← Setlists</button>
-                <h2 style={styles.sectionTitle}>{activeSetlist.name}</h2>
+                {editingSetlistId === activeSetlist.id ? (
+                  <input
+                    autoFocus
+                    style={styles.titleInput}
+                    value={editingSetlistName}
+                    onChange={(e) => setEditingSetlistName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") renameSetlist(activeSetlist.id);
+                      if (e.key === "Escape") { setEditingSetlistId(null); setEditingSetlistName(""); }
+                    }}
+                    onBlur={() => renameSetlist(activeSetlist.id)}
+                  />
+                ) : (
+                  <h2
+                    className="song-name-editable"
+                    style={styles.sectionTitle}
+                    onClick={() => { setEditingSetlistId(activeSetlist.id); setEditingSetlistName(activeSetlist.name); }}
+                    title="Click to rename"
+                  >
+                    {activeSetlist.name}
+                  </h2>
+                )}
                 <p style={styles.sectionSub}>
                   {activeSetlist.songIds.length} song{activeSetlist.songIds.length !== 1 ? "s" : ""}
                   {activeSetlist.songIds.length > 0 && " · drag to reorder"}
@@ -1273,6 +1296,19 @@ const styles = {
   },
   sectionTitle: { fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em" },
   sectionSub: { fontSize: 13, color: "#707088", marginTop: 4 },
+  titleInput: {
+    width: "100%",
+    minWidth: 260,
+    padding: "2px 8px",
+    border: "1px solid #2a2a3a",
+    background: "#0e0e14",
+    color: "#e0e0ec",
+    borderRadius: 8,
+    fontSize: 26,
+    fontWeight: 700,
+    letterSpacing: "-0.03em",
+    fontFamily: "'DM Sans', sans-serif",
+  },
 
   // Buttons
   addBtn: {
