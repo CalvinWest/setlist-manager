@@ -571,16 +571,20 @@ function App() {
   <title>${activeSetlist.name}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* Body is fixed to the printable width of the narrower common paper
+       (A4) with 0.5in margins, so the fit measurement below matches the
+       printed page instead of the popup window's size. Row spacing and
+       numbering are em-based so row height shrinks along with the font. */
     body {
       font-family: 'Georgia', serif;
       background: #fff;
       color: #000;
-      padding: 48px 56px;
+      width: 698px;
     }
     h1 {
       font-size: 32px;
       font-weight: bold;
-      margin-bottom: 32px;
+      margin-bottom: 24px;
       letter-spacing: -0.02em;
     }
     ol {
@@ -591,23 +595,22 @@ function App() {
       counter-increment: songs;
       display: flex;
       align-items: baseline;
-      gap: 16px;
-      padding: 12px 0;
+      gap: 0.5em;
+      padding: 0.3em 0;
       border-bottom: 1px solid #e0e0e0;
+      white-space: nowrap;
     }
     li::before {
       content: counter(songs);
-      min-width: 32px;
-      font-size: 15px;
+      min-width: 1.7em;
+      font-size: 0.55em;
       color: #999;
       font-family: 'Courier New', monospace;
       font-weight: bold;
       text-align: right;
       flex-shrink: 0;
     }
-    @media print {
-      body { padding: 24px 32px; }
-    }
+    @page { margin: 0.5in; }
   </style>
 </head>
 <body>
@@ -618,15 +621,21 @@ function App() {
   <script>
     window.onload = () => {
       const items = Array.from(document.querySelectorAll('li'));
-      items.forEach(li => li.style.whiteSpace = 'nowrap');
+      // Printable height of Letter paper (the shorter common size) with
+      // 0.5in margins: 10in at 96dpi.
+      const PAGE_HEIGHT = 960;
+      const fits = (size) => {
+        items.forEach(li => li.style.fontSize = size + 'px');
+        return items.every(li => li.scrollWidth <= li.clientWidth)
+          && document.body.offsetHeight <= PAGE_HEIGHT;
+      };
       let lo = 8, hi = 72;
       while (hi - lo > 1) {
         const mid = (lo + hi) >> 1;
-        items.forEach(li => li.style.fontSize = mid + 'px');
-        if (items.every(li => li.scrollWidth <= li.clientWidth)) lo = mid;
+        if (fits(mid)) lo = mid;
         else hi = mid;
       }
-      items.forEach(li => li.style.fontSize = lo + 'px');
+      fits(lo);
       window.print();
     };
   <\/script>
