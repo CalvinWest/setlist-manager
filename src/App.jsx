@@ -446,6 +446,19 @@ function App() {
     }
   };
 
+  // Inserts the copy right after the original and opens it for renaming
+  const duplicateSetlist = (id) => {
+    const original = setlists.find((sl) => sl.id === id);
+    if (!original) return;
+    const copy = { ...original, id: uid(), name: `${original.name} (copy)`, songIds: [...original.songIds], date: new Date().toISOString().slice(0, 10) };
+    setSetlists((prev) => {
+      const idx = prev.findIndex((sl) => sl.id === id);
+      return [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)];
+    });
+    setEditingSetlistId(copy.id);
+    setEditingSetlistName(copy.name);
+  };
+
   const renameSetlist = (id) => {
     const name = editingSetlistName.trim();
     if (name) {
@@ -944,6 +957,11 @@ function App() {
                       onClick={(e) => { e.stopPropagation(); setEditingSetlistId(sl.id); setEditingSetlistName(sl.name); }}
                       title="Rename setlist"
                     >✎</button>
+                    <button
+                      style={{ ...styles.iconBtn, ...styles.iconBtnEdit }}
+                      onClick={(e) => { e.stopPropagation(); duplicateSetlist(sl.id); }}
+                      title="Duplicate setlist"
+                    >⧉</button>
                     <button
                       style={{ ...styles.iconBtn, ...styles.iconBtnDanger }}
                       onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete "${sl.name}"?`)) deleteSetlist(sl.id); }}
@@ -1624,7 +1642,7 @@ const styles = {
   setlistGrid: { display: "flex", flexDirection: "column", gap: 8 },
   setlistCard: {
     position: "relative",
-    padding: "18px 90px 18px 20px",
+    padding: "18px 130px 18px 20px",
     background: "#16161f",
     borderRadius: 12,
     cursor: "pointer",
