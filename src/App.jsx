@@ -431,7 +431,7 @@ function App() {
   const addSetlist = () => {
     if (!newSetlistName.trim()) return;
     const sl = { id: uid(), name: newSetlistName.trim(), songIds: [], date: new Date().toISOString().slice(0, 10), gapSeconds: 60 };
-    setSetlists((prev) => [...prev, sl]);
+    setSetlists((prev) => [sl, ...prev]);
     setNewSetlistName("");
     setShowAddSetlist(false);
     setActiveSetlistId(sl.id);
@@ -446,15 +446,12 @@ function App() {
     }
   };
 
-  // Inserts the copy right after the original and opens it for renaming
+  // Puts the copy at the top (newest first) and opens it for renaming
   const duplicateSetlist = (id) => {
     const original = setlists.find((sl) => sl.id === id);
     if (!original) return;
     const copy = { ...original, id: uid(), name: `${original.name} (copy)`, songIds: [...original.songIds], date: new Date().toISOString().slice(0, 10) };
-    setSetlists((prev) => {
-      const idx = prev.findIndex((sl) => sl.id === id);
-      return [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)];
-    });
+    setSetlists((prev) => [copy, ...prev]);
     setEditingSetlistId(copy.id);
     setEditingSetlistName(copy.name);
   };
